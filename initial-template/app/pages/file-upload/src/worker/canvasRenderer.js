@@ -14,7 +14,7 @@ export default class CanvasRenderer {
   }
 
   static getRenderer(canvas) {
-    canvas = canvas;
+    _canvas = canvas;
     _ctx = canvas.getContext("2d");
     const renderer = this;
     let pendingFrame = null;
