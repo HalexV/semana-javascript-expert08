@@ -1,13 +1,17 @@
 export default class VideoProcessor {
   #mp4Demuxer;
+  #webMWriter;
+  #buffers = [];
   /**
    *
    * @param {object} options
    * @param {import('./mp4Demuxer.js').default} options.mp4Demuxer
+   * @param {import('./../deps/webm-writer2.js').default} options.webMWriter
    */
 
-  constructor({ mp4Demuxer }) {
+  constructor({ mp4Demuxer, webMWriter }) {
     this.#mp4Demuxer = mp4Demuxer;
+    this.#webMWriter = webMWriter;
   }
 
   /** @returns {ReadableStream} */
@@ -148,7 +152,23 @@ export default class VideoProcessor {
     });
   }
 
-  async start({ file, encoderConfig, renderFrame }) {
+  transformIntoWebM() {
+    const writable = new WritableStream({
+      write: (chunk) => {
+        this.#webMWriter.addFrame(chunk);
+      },
+      close() {
+        debugger;
+      },
+    });
+
+    return {
+      readable: this.#webMWriter.getStream(),
+      writable,
+    };
+  }
+
+  async start({ file, encoderConfig, renderFrame, sendMessage }) {
     const stream = file.stream();
     const fileName = file.name.split("/").pop().replace(".mp4", "");
     await this.mp4Decoder(stream)
@@ -156,6 +176,27 @@ export default class VideoProcessor {
       .pipeThrough(this.encode144p(encoderConfig))
       .pipeThrough(this.renderDecodedFramesAndGetEncodedChunks(renderFrame))
       // pipeTo só aceita uma writable stream.
+      .pipeThrough(this.transformIntoWebM())
+      // Esse pipe é só para debug.
+      .pipeThrough(
+        new TransformStream({
+          transform: ({ data, position }, controller) => {
+            this.#buffers.push(data);
+            controller.enqueue(data);
+          },
+          flush: () => {
+            // debugger;
+            // sendMessage({
+            //   status: "done",
+            //   buffers: this.#buffers,
+            //   filename: fileName.concat("-144p.webm"),
+            // });
+            sendMessage({
+              status: "done",
+            });
+          },
+        })
+      )
       .pipeTo(
         new WritableStream({
           write(frame) {
