@@ -17,6 +17,7 @@ worker.onmessage = ({ data }) => {
 
 let took = "";
 
+// Pega o canvas e o file escolhido no upload para enviar para o worker.
 view.configureOnFileChange((file) => {
   const canvas = view.getCanvas();
   worker.postMessage(
