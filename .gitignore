@@ -1,3 +1,6 @@
+# Download webserver videos
+initial-template/webserver/downloads
+
 # Logs
 logs
 *.log
