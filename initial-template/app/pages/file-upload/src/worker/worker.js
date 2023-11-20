@@ -35,7 +35,7 @@ const encoderConfig = {
   },
   audio: {
     codec: "opus",
-    sampleRate: 22050,
+    sampleRate: 22050, // tem que pegar do vídeo original.
     numberOfChannels: 2,
     bitrate: 10e6,
   },

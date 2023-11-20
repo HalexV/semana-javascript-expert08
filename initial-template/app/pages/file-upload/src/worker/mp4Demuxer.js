@@ -50,11 +50,6 @@ export default class MP4Demuxer {
   #onVideoSamples(trackId, ref, samples) {
     // Generate and emit an EncodedVideoChunk for each demuxed sample.
     for (const sample of samples) {
-      // console.log(
-      //   "sample.is_sync ? key : delta===",
-      //   sample.is_sync ? "key" : "delta"
-      // );
-      // debugger;
       this.#onChunk({
         video: new EncodedVideoChunk({
           type: sample.is_sync ? "key" : "delta",

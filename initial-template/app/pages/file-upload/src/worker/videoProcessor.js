@@ -1715,7 +1715,6 @@ export default class VideoProcessor {
    *
    * @param {object} options
    * @param {import('./mp4Demuxer.js').default} options.mp4Demuxer
-   * @param {import('./../deps/webm-writer2.js').default} options.webMWriter
    * @param {import('./service.js').default} options.service
    */
 
@@ -1742,13 +1741,9 @@ export default class VideoProcessor {
       video: webMMuxerConfig.video,
       audio: webMMuxerConfig.audio,
       type: "webm",
-      // streaming: true,
+      firstTimestampBehavior: "offset",
     });
     this.#service = service;
-
-    this.#timerOut = setTimeout(() => {
-      this.#webMMuxer.finalize();
-    }, 3000);
   }
 
   /** @returns {ReadableStream} */
@@ -1762,6 +1757,7 @@ export default class VideoProcessor {
             controller.enqueue({ video: frame });
           },
           error(e) {
+            // debugger;
             console.error("error at video mp4Decoder", e);
             controller.error(e);
           },
@@ -1774,6 +1770,7 @@ export default class VideoProcessor {
             controller.enqueue({ audio: frame });
           },
           error(e) {
+            debugger;
             console.error("error at audio mp4Decoder", e);
             controller.error(e);
           },
@@ -1827,7 +1824,7 @@ export default class VideoProcessor {
         //   }, 1000);
         // });
       },
-      cancel() {
+      cancel(reason) {
         debugger;
       },
     });
@@ -1881,6 +1878,7 @@ export default class VideoProcessor {
             controller.enqueue({ video: frame, meta: config });
           },
           error: (err) => {
+            debugger;
             console.error("VideoEncoder 144p", err);
             controller.error(err);
           },
@@ -1961,6 +1959,7 @@ export default class VideoProcessor {
             renderFrame(frame);
           },
           error(e) {
+            debugger;
             console.error("error at renderFrames", e);
             controller.error(e);
           },
@@ -1992,6 +1991,13 @@ export default class VideoProcessor {
   }
 
   resetTimeout() {
+    if (!this.#timerOut) {
+      this.#timerOut = setTimeout(() => {
+        this.#webMMuxer.finalize();
+      }, 3000);
+      return;
+    }
+
     clearTimeout(this.#timerOut);
 
     this.#timerOut = setTimeout(() => {
@@ -2000,43 +2006,16 @@ export default class VideoProcessor {
   }
 
   transformIntoWebM() {
-    let firstVideoChunk = null;
-    const audioChunks = [];
-
     const writable = new WritableStream({
       write: (chunk) => {
         // debugger;
 
         if (chunk.video) {
-          // console.log("VIDEO", chunk.video.timestamp);
-          if (!firstVideoChunk) {
-            firstVideoChunk = chunk;
-            console.log("VIDEO", chunk.video.timestamp);
-            this.#webMMuxer.addVideoChunk(chunk.video, chunk.meta);
-          } else {
-            if (audioChunks.length !== 0) {
-              while (
-                audioChunks[0] &&
-                audioChunks[0].audio.timestamp <= chunk.video.timestamp
-              ) {
-                let audioChunk = audioChunks.shift();
-                console.log("AUDIO", audioChunk.audio.timestamp);
-                this.#webMMuxer.addAudioChunk(
-                  audioChunk.audio,
-                  audioChunk.meta
-                );
-              }
-            }
-
-            console.log("VIDEO", chunk.video.timestamp);
-            this.#webMMuxer.addVideoChunk(chunk.video, chunk.meta);
-          }
+          this.#webMMuxer.addVideoChunk(chunk.video, chunk.meta);
         }
 
         if (chunk.audio) {
-          audioChunks.push(chunk);
-
-          // debugger;
+          this.#webMMuxer.addAudioChunk(chunk.audio, chunk.meta);
         }
 
         this.resetTimeout();
@@ -2105,21 +2084,28 @@ export default class VideoProcessor {
       .pipeThrough(
         new TransformStream({
           transform: ({ data, position }, controller) => {
-            // console.log("data e position", position);
-            if (this.#buffers.length === 0) {
-              this.#buffers.push({ data, position });
-            } else {
-              this.#buffers.push({ data, position });
-              this.#buffers.sort((a, b) => a.position - b.position);
-              // console.log("this.#buffers", this.#buffers);
-            }
+            this.#buffers.push({ data, position });
+
             controller.enqueue(data);
           },
           flush: () => {
             // debugger;
+
+            const fileLength = Math.max(
+              ...this.#buffers.map((x) => x.position + x.data.byteLength)
+            );
+            const resultBuffer = new Uint8Array(fileLength);
+
+            for (const chunk of this.#buffers) {
+              console.log(chunk.data.byteLength, chunk.position);
+              resultBuffer.set(chunk.data, chunk.position);
+            }
+
+            console.log("resultBuffer.length", resultBuffer.length);
+            // debugger;
             sendMessage({
               status: "done",
-              buffers: this.#buffers.map(({ data }) => data),
+              buffers: resultBuffer,
               filename: fileName.concat("-144p.webm"),
             });
             // sendMessage({
