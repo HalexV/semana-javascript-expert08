@@ -34,14 +34,14 @@ Marque esse projeto com uma estrela 🌟 e acesse o nosso [grupo oficial no What
 ### Desafios
 
 - [] - Encodar em 360p e 720p
-- [] - Fazer encoding/decoding track de áudio
+- [x] - Fazer encoding/decoding track de áudio
 - [] - Fazer também upload de track de áudio
 - [] - Concatenar o arquivo final no servidor em um arquivo só
-- [] - Corrigir problema do Webm de não mostrar a duração do video
+- [x] - Corrigir problema do Webm de não mostrar a duração do video
 - [] - Corrigir a responsividade do site
-- [] - Tentar usar outros muxers
-  - https://github.com/Vanilagy/webm-muxer
-  - https://github.com/Vanilagy/mp4-muxer
+- Tentar usar outros muxers
+  - [x] https://github.com/Vanilagy/webm-muxer
+  - [] https://github.com/Vanilagy/mp4-muxer
 
 ### Links mostrados nos aulas:
 
