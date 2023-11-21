@@ -1,7 +1,6 @@
-import { createFile, DataStream } from "../deps/mp4box.0.5.2.js";
+import { createFile } from "../deps/mp4box.0.5.2.js";
 
 export default class MP4Demuxer {
-  #onConfig;
   #onChunk;
   #videoFile;
   #audioFile;
@@ -13,8 +12,7 @@ export default class MP4Demuxer {
    *
    * @returns {Promise<void>}
    */
-  async run(stream, { onConfig, onChunk }) {
-    this.#onConfig = onConfig;
+  async run(stream, { onChunk }) {
     this.#onChunk = onChunk;
 
     this.#videoFile = createFile();
@@ -30,20 +28,6 @@ export default class MP4Demuxer {
       console.error("deu ruim audio mp4Demuxer", error);
 
     return this.#init(stream);
-  }
-
-  #videoDescription({ id }) {
-    const track = this.#videoFile.getTrackById(id);
-
-    for (const entry of track.mdia.minf.stbl.stsd.entries) {
-      const box = entry.avcC || entry.hvcC || entry.vpcC || entry.av1C;
-      if (box) {
-        const stream = new DataStream(undefined, 0, DataStream.BIG_ENDIAN);
-        box.write(stream);
-        return new Uint8Array(stream.buffer, 8); // Remove the box header.
-      }
-    }
-    throw new Error("avcC, hvcC, vpcC, or av1C box not found");
   }
 
   // Transforma de volta na resolução que nós queremos.
@@ -64,20 +48,6 @@ export default class MP4Demuxer {
   #onVideoReady(info) {
     // debugger;
     const [videoTrack] = info.videoTracks;
-
-    // const a = this.#videoFile.getTrackById(audioTrack.id);
-    // const b = this.#videoFile.getTrackById(track.id);
-
-    // debugger;
-    // Esse config vai passar a informação necessária para o encoder do navegador consiga trabalhar com esse vídeo.
-    this.#onConfig({
-      video: {
-        codec: videoTrack.codec,
-        codedHeight: videoTrack.video.height,
-        codedWidth: videoTrack.video.width,
-        description: this.#videoDescription(videoTrack),
-      },
-    });
 
     this.#videoFile.setExtractionOptions(videoTrack.id);
     // MP4Box começar a segmentar
@@ -103,20 +73,6 @@ export default class MP4Demuxer {
   #onAudioReady(info) {
     // debugger;
     const [audioTrack] = info.audioTracks;
-
-    // const a = this.#videoFile.getTrackById(audioTrack.id);
-    // const b = this.#videoFile.getTrackById(track.id);
-
-    // debugger;
-    // Esse config vai passar a informação necessária para o encoder do navegador consiga trabalhar com esse vídeo.
-    this.#onConfig({
-      audio: {
-        codec: audioTrack.codec,
-        sampleRate: audioTrack.audio.sample_rate,
-        numberOfChannels: audioTrack.audio.channel_count,
-        // description: this.#audioDescription(audioTrack),
-      },
-    });
 
     this.#audioFile.setExtractionOptions(audioTrack.id);
     // MP4Box começar a segmentar

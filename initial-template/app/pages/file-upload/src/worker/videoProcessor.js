@@ -1,7 +1,5 @@
 "use strict";
 
-import { webMMuxerConfig } from "./worker.js";
-
 var WebMMuxer = (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -1704,6 +1702,8 @@ If you want to allow non-zero first timestamps, set firstTimestampBehavior: 'per
 
 export default class VideoProcessor {
   #mp4Demuxer;
+  #mp4OriginalInfo;
+  #encoderConfig;
   #webMMuxer;
   #service;
   #videoOrder = [];
@@ -1718,7 +1718,10 @@ export default class VideoProcessor {
    * @param {import('./service.js').default} options.service
    */
 
-  constructor({ mp4Demuxer, service }) {
+  constructor({ mp4Demuxer, mp4OriginalInfo, encoderConfig, service }) {
+    this.#mp4OriginalInfo = mp4OriginalInfo;
+    this.#encoderConfig = encoderConfig;
+
     this.#muxerStream = new TransformStream({
       flush() {
         // debugger;
@@ -1728,6 +1731,7 @@ export default class VideoProcessor {
     this.#muxerStreamWriter = this.#muxerStream.writable.getWriter();
 
     this.#mp4Demuxer = mp4Demuxer;
+
     this.#webMMuxer = new WebMMuxer.Muxer({
       target: new WebMMuxer.StreamTarget(
         (data, position) => {
@@ -1738,8 +1742,16 @@ export default class VideoProcessor {
           this.#muxerStreamWriter.close();
         }
       ),
-      video: webMMuxerConfig.video,
-      audio: webMMuxerConfig.audio,
+      video: {
+        codec: "V_VP9",
+        width: this.#encoderConfig.video.width,
+        height: this.#encoderConfig.video.height,
+      },
+      audio: {
+        codec: "A_OPUS",
+        numberOfChannels: this.#mp4OriginalInfo.audio.numberOfChannels,
+        sampleRate: this.#mp4OriginalInfo.audio.sampleRate,
+      },
       type: "webm",
       firstTimestampBehavior: "offset",
     });
@@ -1776,35 +1788,14 @@ export default class VideoProcessor {
           },
         });
 
+        videoDecoder.configure(this.#mp4OriginalInfo.video);
+        audioDecoder.configure(this.#mp4OriginalInfo.audio);
+
         const videoOrder = this.#videoOrder;
 
         return this.#mp4Demuxer.run(stream, {
-          async onConfig(config) {
-            // const { supported } = await VideoDecoder.isConfigSupported(config);
-            // if (!supported) {
-            //   console.error(
-            //     "mp4Muxer VideoDecoder config not supported!",
-            //     config
-            //   );
-            //   controller.close();
-            //   return;
-            // }
-            // debugger;
-            if (config.video) {
-              videoDecoder.configure(config.video);
-            }
-
-            if (config.audio) {
-              audioDecoder.configure(config.audio);
-            }
-          },
           /** @param {EncodedVideoChunk} chunk */
           onChunk(chunk) {
-            // debugger;
-            // Toda vez que for chamada vai cair no output do VideoDecoder.
-            // Até aqui vem alternado key e delta.
-            // debugger;
-            // console.log("chunk.video.type", chunk.video.type);
             if (chunk.video) {
               if (chunk.video.type === "key") {
                 videoOrder.push(true);
@@ -1818,11 +1809,6 @@ export default class VideoProcessor {
             }
           },
         });
-        // .then(() => {
-        //   setTimeout(() => {
-        //     controller.close();
-        //   }, 1000);
-        // });
       },
       cancel(reason) {
         debugger;
@@ -1840,7 +1826,12 @@ export default class VideoProcessor {
           await VideoEncoder.isConfigSupported(encoderConfig.video);
 
         const { supported: audioSupported } =
-          await AudioEncoder.isConfigSupported(encoderConfig.audio);
+          await AudioEncoder.isConfigSupported({
+            codec: encoderConfig.audio.codec,
+            bitrate: this.#mp4OriginalInfo.audio.bitrate,
+            sampleRate: this.#mp4OriginalInfo.audio.sampleRate,
+            numberOfChannels: this.#mp4OriginalInfo.audio.numberOfChannels,
+          });
 
         if (!videoSupported) {
           const message = "encode144p VideoEncoder config not supported!";
@@ -1851,7 +1842,12 @@ export default class VideoProcessor {
 
         if (!audioSupported) {
           const message = "encode144p AudioEncoder config not supported!";
-          console.error(message, encoderConfig.audio);
+          console.error(message, {
+            codec: encoderConfig.audio.codec,
+            bitrate: this.#mp4OriginalInfo.audio.bitrate,
+            sampleRate: this.#mp4OriginalInfo.audio.sampleRate,
+            numberOfChannels: this.#mp4OriginalInfo.audio.numberOfChannels,
+          });
           controller.error(message);
           return;
         }
@@ -1866,15 +1862,6 @@ export default class VideoProcessor {
            * @param {EncodedVideoChunkMetadata} config
            */
           output: (frame, config) => {
-            // if (config.decoderConfig) {
-            //   const decoderConfig = {
-            //     type: "config",
-            //     config: config.decoderConfig,
-            //   };
-            //   controller.enqueue({ video: decoderConfig });
-            // }
-            // console.log("frame.type", frame.type);
-            // console.log("config", config);
             controller.enqueue({ video: frame, meta: config });
           },
           error: (err) => {
@@ -1891,15 +1878,6 @@ export default class VideoProcessor {
            * @param {EncodedAudioChunkMetadata} config
            */
           output: (frame, config) => {
-            // if (config.decoderConfig) {
-            //   const decoderConfig = {
-            //     type: "config",
-            //     config: config.decoderConfig,
-            //   };
-            //   controller.enqueue({ audio: decoderConfig });
-            // }
-            // console.log("frame.type", frame.type);
-            // console.log("config", config);
             controller.enqueue({ audio: frame, meta: config });
             // debugger;
           },
@@ -1911,8 +1889,12 @@ export default class VideoProcessor {
         });
 
         await _videoEncoder.configure(encoderConfig.video);
-        await _audioEncoder.configure(encoderConfig.audio);
-        // debugger;
+        await _audioEncoder.configure({
+          codec: encoderConfig.audio.codec,
+          bitrate: this.#mp4OriginalInfo.audio.bitrate,
+          sampleRate: this.#mp4OriginalInfo.audio.sampleRate,
+          numberOfChannels: this.#mp4OriginalInfo.audio.numberOfChannels,
+        });
       },
       cancel(reason) {
         debugger;
@@ -2071,12 +2053,12 @@ export default class VideoProcessor {
     });
   }
 
-  async start({ file, encoderConfig, renderFrame, sendMessage }) {
+  async start({ file, renderFrame, sendMessage }) {
     const stream = file.stream();
     const fileName = file.name.split("/").pop().replace(".mp4", "");
     await this.mp4Decoder(stream)
       // pipeTrough para direcionar os dados para uma transform stream.
-      .pipeThrough(this.encode144p(encoderConfig))
+      .pipeThrough(this.encode144p(this.#encoderConfig))
       .pipeThrough(this.renderDecodedFramesAndGetEncodedChunks(renderFrame))
       // pipeTo só aceita uma writable stream.
       .pipeThrough(this.transformIntoWebM())
@@ -2097,15 +2079,13 @@ export default class VideoProcessor {
             const resultBuffer = new Uint8Array(fileLength);
 
             for (const chunk of this.#buffers) {
-              console.log(chunk.data.byteLength, chunk.position);
               resultBuffer.set(chunk.data, chunk.position);
             }
 
-            console.log("resultBuffer.length", resultBuffer.length);
             // debugger;
             sendMessage({
               status: "done",
-              buffers: resultBuffer,
+              buffer: resultBuffer,
               filename: fileName.concat("-144p.webm"),
             });
             // sendMessage({

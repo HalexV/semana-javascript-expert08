@@ -58,11 +58,9 @@ export default class View {
     this.#fileUpload.addEventListener("change", this.onChange(fn));
   }
 
-  downloadBlobAsFile(buffers, filename) {
-    const blob = new Blob([buffers], { type: "video/webm" });
-    console.log("buffers.length", buffers.length);
-    console.log("blob.size", blob.size);
-    // debugger;
+  downloadBlobAsFile(buffer, filename) {
+    const blob = new Blob([buffer], { type: "video/webm" });
+
     const blobUrl = URL.createObjectURL(blob);
 
     const a = document.createElement("a");
