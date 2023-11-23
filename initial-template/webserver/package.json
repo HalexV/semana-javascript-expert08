@@ -12,10 +12,11 @@
   "dependencies": {
     "busboy": "^1.6.0",
     "pino": "^8.15.1",
-    "pino-pretty": "^10.2.0"
+    "pino-pretty": "^10.2.0",
+    "stream-json": "^1.8.0"
   },
   "type": "module",
   "engines": {
-    "node": "v18.17.0"
+    "node": "v18.18.2"
   }
 }

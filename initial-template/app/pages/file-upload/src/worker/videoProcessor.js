@@ -1707,7 +1707,7 @@ export default class VideoProcessor {
   #webMMuxer;
   #service;
   #videoOrder = [];
-  #buffers = [];
+  // #buffers = [];
   #muxerStream;
   #muxerStreamWriter;
   #timerOut;
@@ -2018,7 +2018,8 @@ export default class VideoProcessor {
     let byteCount = 0;
     let segmentCount = 0;
     const triggerUpload = async (chunks) => {
-      const blob = new Blob(chunks, { type: "video/webm" });
+      // console.log(JSON.stringify(chunks));
+      const blob = new Blob([JSON.stringify(chunks)], { type: "text/plain" });
 
       // Fazer o upload
       await this.#service.uploadFile({
@@ -2037,12 +2038,13 @@ export default class VideoProcessor {
        * @param {object} options
        * @param {Uint8Array} options.data
        */
-      async write({ data }) {
-        chunks.push(data);
-        byteCount += data.byteLength;
+      async write(chunk) {
+        chunks.push(chunk);
 
+        byteCount += chunk.data.byteLength;
+        // debugger;
         // Se for menor que 10mb não faz upload.
-        if (byteCount <= 10e6) return;
+        if (byteCount <= 5e5) return;
         await triggerUpload(chunks);
         // renderFrame(frame);
       },
@@ -2055,7 +2057,17 @@ export default class VideoProcessor {
 
   async start({ file, renderFrame, sendMessage }) {
     const stream = file.stream();
-    const fileName = file.name.split("/").pop().replace(".mp4", "");
+    const fileName = file.name
+      .split("/")
+      .pop()
+      .replace(".mp4", "")
+      .normalize("NFD")
+      .replace(/\p{Mn}/gu, "")
+      .replace(/[^a-zA-Z0-9]/g, " ")
+      .trim()
+      .replace(/[^a-zA-Z0-9]/g, "_")
+      .toLocaleLowerCase("en-US");
+
     await this.mp4Decoder(stream)
       // pipeTrough para direcionar os dados para uma transform stream.
       .pipeThrough(this.encode144p(this.#encoderConfig))
@@ -2063,49 +2075,53 @@ export default class VideoProcessor {
       // pipeTo só aceita uma writable stream.
       .pipeThrough(this.transformIntoWebM())
       // Esse pipe é só para debug.
-      .pipeThrough(
-        new TransformStream({
-          transform: ({ data, position }, controller) => {
-            this.#buffers.push({ data, position });
+      // .pipeThrough(
+      //   new TransformStream({
+      //     transform: ({ data, position }, controller) => {
+      //       this.#buffers.push({ data, position });
 
-            controller.enqueue(data);
-          },
-          flush: () => {
-            // debugger;
+      //       controller.enqueue(data);
+      //     },
+      //     flush: () => {
+      //       // debugger;
 
-            const fileLength = Math.max(
-              ...this.#buffers.map((x) => x.position + x.data.byteLength)
-            );
-            const resultBuffer = new Uint8Array(fileLength);
+      //       const fileLength = Math.max(
+      //         ...this.#buffers.map((x) => x.position + x.data.byteLength)
+      //       );
+      //       const resultBuffer = new Uint8Array(fileLength);
 
-            for (const chunk of this.#buffers) {
-              resultBuffer.set(chunk.data, chunk.position);
-            }
+      //       for (const chunk of this.#buffers) {
+      //         resultBuffer.set(chunk.data, chunk.position);
+      //       }
 
-            // debugger;
-            sendMessage({
-              status: "done",
-              buffer: resultBuffer,
-              filename: fileName.concat("-144p.webm"),
-            });
-            // sendMessage({
-            //   status: "done",
-            // });
-          },
-        })
-      )
-      // .pipeTo(this.upload(fileName, "144p", "webm"));
+      //       // debugger;
+      //       sendMessage({
+      //         status: "done",
+      //         buffer: resultBuffer,
+      //         filename: fileName.concat("-144p.webm"),
+      //       });
+      //       // sendMessage({
+      //       //   status: "done",
+      //       // });
+      //     },
+      //   })
+      // )
+      .pipeTo(this.upload(fileName, "144p", "tmp"));
 
-      // sendMessage({
-      //   status: "done",
-      // });
-      .pipeTo(
-        new WritableStream({
-          write(frame) {
-            // debugger;
-            // renderFrame(frame);
-          },
-        })
-      );
+    sendMessage({
+      status: "done",
+    });
+
+    await this.#service.makeWebmFile({
+      filename: `${fileName}-144p`,
+    });
+    // .pipeTo(
+    //   new WritableStream({
+    //     write(frame) {
+    //       // debugger;
+    //       // renderFrame(frame);
+    //     },
+    //   })
+    // );
   }
 }
