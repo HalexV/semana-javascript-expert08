@@ -5,6 +5,7 @@ let _ctx = {};
 export default class CanvasRenderer {
   /** @param {VideoFrame} frame */
   static draw(frame) {
+    _ctx.reset();
     const { displayHeight, displayWidth } = frame;
 
     _canvas.width = displayWidth;

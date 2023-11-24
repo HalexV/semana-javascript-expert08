@@ -1782,7 +1782,7 @@ export default class VideoProcessor {
             controller.enqueue({ audio: frame });
           },
           error(e) {
-            debugger;
+            // debugger;
             console.error("error at audio mp4Decoder", e);
             controller.error(e);
           },
@@ -1817,7 +1817,7 @@ export default class VideoProcessor {
   }
 
   // Encode o vídeo decoded para resolução 144p
-  encode144p(encoderConfig) {
+  encoder(encoderConfig) {
     let _videoEncoder;
     let _audioEncoder;
     const readable = new ReadableStream({
@@ -1834,14 +1834,14 @@ export default class VideoProcessor {
           });
 
         if (!videoSupported) {
-          const message = "encode144p VideoEncoder config not supported!";
+          const message = "encoder VideoEncoder config not supported!";
           console.error(message, encoderConfig.video);
           controller.error(message);
           return;
         }
 
         if (!audioSupported) {
-          const message = "encode144p AudioEncoder config not supported!";
+          const message = "encoder AudioEncoder config not supported!";
           console.error(message, {
             codec: encoderConfig.audio.codec,
             bitrate: this.#mp4OriginalInfo.audio.bitrate,
@@ -1866,7 +1866,7 @@ export default class VideoProcessor {
           },
           error: (err) => {
             debugger;
-            console.error("VideoEncoder 144p", err);
+            console.error("VideoEncoder", err);
             controller.error(err);
           },
         });
@@ -1883,7 +1883,7 @@ export default class VideoProcessor {
           },
           error: (err) => {
             debugger;
-            console.error("AudioEncoder 144p", err);
+            console.error("AudioEncoder", err);
             controller.error(err);
           },
         });
@@ -2020,7 +2020,7 @@ export default class VideoProcessor {
     const triggerUpload = async (chunks) => {
       // console.log(JSON.stringify(chunks));
       const blob = new Blob([JSON.stringify(chunks)], { type: "text/plain" });
-
+      // console.log("blob.size", blob.size);
       // Fazer o upload
       await this.#service.uploadFile({
         filename: `${filename}-${resolution}.${++segmentCount}.${type}`,
@@ -2044,7 +2044,7 @@ export default class VideoProcessor {
         byteCount += chunk.data.byteLength;
         // debugger;
         // Se for menor que 10mb não faz upload.
-        if (byteCount <= 5e5) return;
+        if (byteCount <= 10e6) return;
         await triggerUpload(chunks);
         // renderFrame(frame);
       },
@@ -2055,7 +2055,7 @@ export default class VideoProcessor {
     });
   }
 
-  async start({ file, renderFrame, sendMessage }) {
+  async start({ file, renderFrame, resolution }) {
     const stream = file.stream();
     const fileName = file.name
       .split("/")
@@ -2070,7 +2070,7 @@ export default class VideoProcessor {
 
     await this.mp4Decoder(stream)
       // pipeTrough para direcionar os dados para uma transform stream.
-      .pipeThrough(this.encode144p(this.#encoderConfig))
+      .pipeThrough(this.encoder(this.#encoderConfig))
       .pipeThrough(this.renderDecodedFramesAndGetEncodedChunks(renderFrame))
       // pipeTo só aceita uma writable stream.
       .pipeThrough(this.transformIntoWebM())
@@ -2106,22 +2106,22 @@ export default class VideoProcessor {
       //     },
       //   })
       // )
-      .pipeTo(this.upload(fileName, "144p", "tmp"));
+      // .pipeTo(
+      //   new WritableStream({
+      //     write(frame) {
+      //       // debugger;
+      //       // renderFrame(frame);
+      //     },
+      //   })
+      // );
+      .pipeTo(this.upload(fileName, resolution, "tmp"));
 
-    sendMessage({
-      status: "done",
-    });
+    // sendMessage({
+    //   status: "done",
+    // });
 
     await this.#service.makeWebmFile({
-      filename: `${fileName}-144p`,
+      filename: `${fileName}-${resolution}`,
     });
-    // .pipeTo(
-    //   new WritableStream({
-    //     write(frame) {
-    //       // debugger;
-    //       // renderFrame(frame);
-    //     },
-    //   })
-    // );
   }
 }

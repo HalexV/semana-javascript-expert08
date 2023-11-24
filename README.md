@@ -33,7 +33,7 @@ Marque esse projeto com uma estrela 🌟 e acesse o nosso [grupo oficial no What
 
 ### Desafios
 
-- [] - Encodar em 360p e 720p
+- [x] - Encodar em 360p e 720p
 - [x] - Fazer encoding/decoding track de áudio
 - [x] - Fazer também upload de track de áudio
 - [x] - Concatenar o arquivo final no servidor em um arquivo só

@@ -22,10 +22,9 @@ const hdConstraints = {
   bitrate: 1024e3,
 };
 
-const encoderConfig = {
+const encoderConfig240p = {
   video: {
     ...qvgaConstraints,
-    // bitrate: 10e6,
     // WebM
     codec: "vp09.00.10.08",
     pt: 4,
@@ -39,10 +38,44 @@ const encoderConfig = {
   },
   audio: {
     codec: "opus",
-    // sampleRate precisa ser exatamente igual ao sample rate original para que o encoder consiga trabalhar.
-    // sampleRate: 22050, // tem que pegar do vídeo original.
-    // numberOfChannels: 2,
-    // bitrate: 10e6,
+  },
+};
+
+const encoderConfig480p = {
+  video: {
+    ...vgaConstraints,
+    // WebM
+    codec: "vp09.00.10.08",
+    pt: 4,
+    hardwareAcceleration: "prefer-software",
+
+    // MP4
+    // codec: "avc1.42002A",
+    // pt: 1,
+    // hardwareAcceleration: "prefer-hardware",
+    // avc: { format: "annexb" },
+  },
+  audio: {
+    codec: "opus",
+  },
+};
+
+const encoderConfig720p = {
+  video: {
+    ...hdConstraints,
+    // WebM
+    codec: "vp09.00.10.08",
+    pt: 4,
+    hardwareAcceleration: "prefer-software",
+
+    // MP4
+    // codec: "avc1.42002A",
+    // pt: 1,
+    // hardwareAcceleration: "prefer-hardware",
+    // avc: { format: "annexb" },
+  },
+  audio: {
+    codec: "opus",
   },
 };
 
@@ -63,23 +96,53 @@ onmessage = async ({ data }) => {
 
   // debugger;
 
-  const videoProcessor = new VideoProcessor({
-    mp4Demuxer,
-    mp4OriginalInfo,
-    encoderConfig,
-    service,
-  });
+  if (mp4OriginalInfo.video.codedHeight >= 240) {
+    const videoProcessor = new VideoProcessor({
+      mp4Demuxer,
+      mp4OriginalInfo,
+      encoderConfig: encoderConfig240p,
+      service,
+    });
 
-  await videoProcessor.start({
-    file: data.file,
-    renderFrame,
-    sendMessage(message) {
-      self.postMessage(message);
-    },
-  });
+    await videoProcessor.start({
+      file: data.file,
+      renderFrame,
+      resolution: "240p",
+    });
+  }
+
+  if (mp4OriginalInfo.video.codedHeight >= 480) {
+    const videoProcessor = new VideoProcessor({
+      mp4Demuxer,
+      mp4OriginalInfo,
+      encoderConfig: encoderConfig480p,
+      service,
+    });
+
+    await videoProcessor.start({
+      file: data.file,
+      renderFrame,
+      resolution: "480p",
+    });
+  }
+
+  if (mp4OriginalInfo.video.codedHeight >= 720) {
+    const videoProcessor = new VideoProcessor({
+      mp4Demuxer,
+      mp4OriginalInfo,
+      encoderConfig: encoderConfig720p,
+      service,
+    });
+
+    await videoProcessor.start({
+      file: data.file,
+      renderFrame,
+      resolution: "720p",
+    });
+  }
 
   // No navegador temos o window, no worker o self.
-  // self.postMessage({
-  //   status: "done",
-  // });
+  self.postMessage({
+    status: "done",
+  });
 };
